@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "839365380371",
+    "project_id": "flexpay-app-77b85",
+    "storage_bucket": "flexpay-app-77b85.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:839365380371:android:f4dc1d9d2948b84d2b72e6",
+        "android_client_info": {
+          "package_name": "ke.co.flexpay.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrSeHNzdjixquixau1PSF0DZi0JASRHGc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
