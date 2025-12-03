@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -16,27 +17,15 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final shadowColor = isDarkMode
-        ? Colors.black.withOpacity(0.4)
-        : Colors.grey.withOpacity(0.3);
-    final activeColor = isDarkMode ? Colors.amber : Colors.amber;
-    final inactiveColor = Colors.white;
+    final availableWidth = screenWidth - (screenWidth * 0.03);
+    final pillWidth = availableWidth / items.length;
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(15),
-          topRight: Radius.circular(15),
+          topLeft: Radius.circular(18),
+          topRight: Radius.circular(18),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor,
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-        color: isDarkMode ? Colors.grey[900] : null,
         image: const DecorationImage(
           image: AssetImage('assets/images/appbarbackground.png'),
           fit: BoxFit.cover,
@@ -45,45 +34,106 @@ class BottomNavBar extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(
-            vertical: screenWidth * 0.02, 
-            horizontal: screenWidth * 0.02,
+            vertical: screenWidth * 0.015,
+            horizontal: screenWidth * 0.015,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: items.asMap().entries.map((entry) {
-              final index = entry.key;
-              final item = entry.value;
-              final isSelected = currentIndex == index;
 
-              return GestureDetector(
-                onTap: () => onTabTapped(index),
-                child: Container(
-                  constraints: BoxConstraints(
-                    minWidth: screenWidth * 0.09),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        item.icon,
-                        size: screenWidth * 0.09, 
-                        color: isSelected ? activeColor : inactiveColor,
-                      ),
-                      // const SizedBox(height: 2),
-                      Text(
-                        item.label,
-                        style: GoogleFonts.montserrat(
-                          fontSize: 8, 
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.w400,
-                          color: isSelected ? activeColor : inactiveColor,
+          // STACK = bubble + icons
+          child: SizedBox(
+            height: 54,
+            child: Stack(
+              children: [
+               
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  left: currentIndex * pillWidth,
+                  child: _LiquidGlassPill(width: pillWidth),
+                ),
+
+                // 🔵 Icons + labels on top - wrapped in Flexible to prevent overflow
+                Positioned.fill(
+                  child: Row(
+                    children: items.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () => onTabTapped(index),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                item.icon,
+                                size: screenWidth * 0.080,
+                                color: index == currentIndex
+                                    ? Colors.white
+                                    : Colors.white70,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.label,
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 9,
+                                  fontWeight: index == currentIndex
+                                      ? FontWeight.bold
+                                      : FontWeight.w400,
+                                  color: index == currentIndex
+                                      ? Colors.white
+                                      : Colors.white70,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ),
                 ),
-              );
-            }).toList(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiquidGlassPill extends StatelessWidget {
+  final double width;
+
+  const _LiquidGlassPill({required this.width});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+        child: Container(
+          width: width,
+          height: 54,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+
+            // Apple liquid glass = translucent white + slight border + highlight gradient
+            color: Colors.white.withOpacity(0.18),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.28),
+              width: 1.2,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.26), // highlight
+                Colors.white.withOpacity(0.06), // depth
+              ],
+            ),
           ),
         ),
       ),

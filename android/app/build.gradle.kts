@@ -35,7 +35,7 @@ android {
 
     defaultConfig {
         applicationId = "ke.co.flexpay.app"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = 97
         versionName = "2.0.67"
