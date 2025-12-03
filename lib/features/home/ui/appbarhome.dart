@@ -24,7 +24,7 @@ class AppBarHome extends StatefulWidget {
   final String userName;
   final UserModel userModel;
   final bool isDataReady;
-  final VoidCallback? onWalletBalanceMissing; // Add the new parameter
+  final VoidCallback? onWalletBalanceMissing;
 
   const AppBarHome(
     BuildContext context, {
@@ -32,7 +32,7 @@ class AppBarHome extends StatefulWidget {
     required this.userName,
     required this.userModel,
     required this.isDataReady,
-    this.onWalletBalanceMissing, // Initialize the new parameter
+    this.onWalletBalanceMissing,
   });
 
   @override
@@ -43,12 +43,12 @@ class _AppBarHomeState extends State<AppBarHome> {
   bool isBalanceVisible = true;
   bool isKapuButtonPressed = false;
   bool isDataReady = false;
-  double? cachedBalance; // Cached balance to avoid blank data
+  double? cachedBalance;
 
   @override
   void initState() {
     super.initState();
-    _fetchInitialData(); // Fetch data when the widget is initialized
+    _fetchInitialData();
   }
 
   @override
@@ -58,11 +58,10 @@ class _AppBarHomeState extends State<AppBarHome> {
 
   void _fetchInitialData() async {
     await context.read<HomeCubit>().fetchUserWallet();
-    await _ensureMinimumShimmerDuration(); // Ensure shimmer lasts for the full duration
+    await _ensureMinimumShimmerDuration();
     setState(() {
       isDataReady = true;
 
-      // Update cached balance
       final state = context.read<HomeCubit>().state;
       if (state is HomeWalletFetched) {
         final wallet = state.walletResponse.data?.walletAccount?.walletBalance;
@@ -77,7 +76,7 @@ class _AppBarHomeState extends State<AppBarHome> {
 
   void _manualRefresh() {
     setState(() {
-      isDataReady = false; // Show shimmer while refreshing
+      isDataReady = false;
     });
     _fetchInitialData();
   }
@@ -99,21 +98,12 @@ class _AppBarHomeState extends State<AppBarHome> {
     }
   }
 
-  String _getGreetingEmoji() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) {
-      return " 🌅";
-    } else if (hour < 17) {
-      return " ☀️";
-    } else {
-      return " 🌙";
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -121,316 +111,282 @@ class _AppBarHomeState extends State<AppBarHome> {
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 44.h),
-          decoration: BoxDecoration(
-            image: const DecorationImage(
-              image: AssetImage('assets/images/appbarbackground.png'),
-              fit: BoxFit.cover,
-            ),
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(0.r),
-              bottomRight: Radius.circular(40.r),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: screenHeight * 0.02),
-
-              /// Centered Logo
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          children: [
+            // Top section with profile, greeting, and notifications
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 44.h),
+              color: isDark ? theme.scaffoldBackgroundColor : Colors.grey[50],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.asset(
-                    'assets/icon/logos/logo.png',
-                    height: 30.h,
-                    fit: BoxFit.contain,
+                  SizedBox(height: screenHeight * 0.02),
+
+                  /// Profile + Greeting + Notifications
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ProfilePage(userModel: widget.userModel),
+                                ),
+                              );
+                            },
+                            child: CircleAvatar(
+                              radius: 22.r,
+                              backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+                              child: Icon(
+                                Icons.person_2,
+                                size: 28.sp,
+                                color: isDark ? Colors.blue[300] : Colors.blue,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _getGreetingOnly().replaceAll(', ', ''),
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 12.sp,
+                                  color: isDark ? Colors.grey[400] : Colors.black54,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              Text(
+                                widget.userName.toUpperCase(),
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 20.sp,
+                                  color: isDark ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          // QR Code Icon
+                          GestureDetector(
+                            onTap: () {
+                              // Add QR code functionality here
+                            },
+                            child: Container(
+                              padding: EdgeInsets.all(8.w),
+                              decoration: BoxDecoration(
+                                color: isDark 
+                                    ? Colors.grey[800]?.withOpacity(0.5) 
+                                    : Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                              child: Icon(
+                                Icons.qr_code_scanner,
+                                color: isDark ? Colors.grey[300] : Colors.black54,
+                                size: 24.sp,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          // Notifications
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const NotificationsPage(),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: EdgeInsets.all(8.w),
+                              decoration: BoxDecoration(
+                                color: isDark 
+                                    ? Colors.grey[800]?.withOpacity(0.5) 
+                                    : Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                              child: Stack(
+                                children: [
+                                  Icon(
+                                    Icons.notifications_outlined,
+                                    color: isDark ? Colors.grey[300] : Colors.black54,
+                                    size: 24.sp,
+                                  ),
+                                  // Red dot for notifications
+                                  Positioned(
+                                    top: 0,
+                                    right: 0,
+                                    child: Container(
+                                      width: 8.w,
+                                      height: 8.h,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
+            ),
+            
 
-              SizedBox(height: screenHeight * 0.02),
-
-              /// Profile + Greeting + Notifications
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  ProfilePage(userModel: widget.userModel),
-                            ),
-                          );
-                        },
-                        child: CircleAvatar(
-                          radius: 22.r,
-                          backgroundColor: Colors.white,
-                          child: Icon(
-                            Icons.person_2,
-                            size: 28.sp,
-                            color: Colors.blue,
+            // Balance card section
+            Transform.translate(
+              offset: Offset(0, -20.h), // Overlap with the top section
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 20.w),
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/appbarbackground.png'),
+                    fit: BoxFit.cover,
+                  ),
+                  borderRadius: BorderRadius.circular(16.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Account Balance header with masked account number
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total Amount',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 12.sp,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
-                      ),
-                      SizedBox(width: 10.w),
-                      RichText(
-                        text: TextSpan(
+                        GestureDetector(
+                          onTap: () {
+                            _manualRefresh();
+                          },
+                          child: Icon(
+                            Icons.refresh,
+                            color: Colors.white70,
+                            size: 16.sp,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 8.h),
+                    
+                    // Balance amount with visibility toggle
+                    BlocBuilder<HomeCubit, HomeState>(
+                      builder: (context, state) {
+                        if (!widget.isDataReady) {
+                          return const AppBarBalanceShimmer();
+                        }
+
+                        double? balance = cachedBalance;
+                        if (state is HomeWalletFetched) {
+                          final wallet = state.walletResponse.data?.walletAccount?.walletBalance;
+                          balance = wallet?.balance.toDouble();
+                        }
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            TextSpan(
-                              text: _getGreetingOnly(),
+                            Text(
+                              balance != null
+                                  ? (isBalanceVisible
+                                        ? 'KES ${balance.toStringAsFixed(2)}'
+                                        : 'KES ******')
+                                  : 'KES ******',
                               style: GoogleFonts.montserrat(
-                                fontSize: 14.sp,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                            TextSpan(
-                              text: widget.userName,
-                              style: GoogleFonts.montserrat(
-                                fontSize: 16.sp,
-                                color: Colors.white,
+                                fontSize: 24.sp,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 1.2,
                               ),
                             ),
-                            TextSpan(
-                              text: _getGreetingEmoji(),
-                              style: GoogleFonts.montserrat(
-                                fontSize: 14.sp,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w400,
+                            GestureDetector(
+                              onTap: toggleBalanceVisibility,
+                              child: Icon(
+                                isBalanceVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: Colors.white70,
+                                size: 20.sp,
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.notifications_outlined,
-                      color: Colors.white,
-                      size: screenWidth * 0.09,
+                        );
+                      },
                     ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const NotificationsPage(),
+                    
+                    SizedBox(height: 20.h),
+                    
+                    // Action buttons row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildActionButton(
+                          Icons.discount_rounded,
+                          "Generate\nVouchers",
+                           onTap: () async {
+                            showMerchantVoucherModal(
+                              context,
+                              "FlexPay",
+                              0, // Default merchant ID for the Vouchers button
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 22.h),
-
-              /// Balance Label with Info Icon
-              Row(
-                children: [
-                  Text(
-                    'Total balance',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 12.sp,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  SizedBox(width: 4.w), // Add spacing between text and icon
-                  GestureDetector(
-                    onTap: () {
-                      _manualRefresh();
-                      showDialog(
-                        context: context,
-                        builder: (context) => Dialog(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16.r),
-                          ),
-                          child: Container(
-                            padding: EdgeInsets.all(16.w),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16.r),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  color: Colors.blue,
-                                  size: 48.sp,
-                                ),
-                                SizedBox(height: 16.h),
-                                Text(
-                                  'Balance Information',
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 18.sp,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                SizedBox(height: 8.h),
-                                Text(
-                                  'Feeling like the balance is outdated...lets refresh it.',
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 14.sp,
-                                    color: Colors.black54,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 16.h),
-                                ElevatedButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8.r),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'OK',
-                                    style: GoogleFonts.montserrat(
-                                      fontSize: 14.sp,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                         _buildActionButton(
+                          Icons.arrow_downward,
+                          "Top up",
+                          onTap: () async {
+                            final result = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(builder: (_) => TopUpHomePage()),
+                            );
+                            if (result == true) {
+                              context.read<HomeCubit>().fetchUserWallet();
+                            }
+                          },
                         ),
-                      );
-                    },
-                    child: Icon(
-                      Icons.info_outline,
-                      color: Colors.yellow,
-                      size: 16.sp,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 4.h),
-
-              /// Balance Value + Visibility Toggle
-              BlocBuilder<HomeCubit, HomeState>(
-                builder: (context, state) {
-                  if (!widget.isDataReady) {
-                    return const AppBarBalanceShimmer();
-                  }
-
-                  double? balance = cachedBalance;
-                  if (state is HomeWalletFetched) {
-                    final wallet =
-                        state.walletResponse.data?.walletAccount?.walletBalance;
-                    balance = wallet?.balance.toDouble();
-                  }
-
-                  return Row(
-                    children: [
-                      Text(
-                        balance != null
-                            ? (isBalanceVisible
-                                  ? 'Ksh ${balance.toStringAsFixed(2)}'
-                                  : '••••••')
-                            : 'Ksh ${cachedBalance?.toStringAsFixed(2) ?? '••••••'}', // Fallback to cached balance
-                        style: GoogleFonts.montserrat(
-                          fontSize: 28.sp,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
+                        _buildActionButton(
+                          Icons.account_balance_wallet,
+                            "Withdraw",
+                            onTap: () async {
+                              final result = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(builder: (_) => WithdrawPage()),
+                              );
+                              if (result == true) {
+                                context.read<HomeCubit>().fetchUserWallet();
+                              }
+                            },
                         ),
-                      ),
-                      SizedBox(
-                        width: 8.w,
-                      ), // Add small spacing between balance and icon
-                      GestureDetector(
-                        onTap: toggleBalanceVisibility,
-                        child: Icon(
-                          isBalanceVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Colors.white70,
-                          size: 24.sp,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-
-              SizedBox(height: 20.h),
-
-              /// Action Buttons (Shop, Top up, Withdraw, Kapu)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // _buildActionButton(
-                  //   Icons.shopping_cart,
-                  //   "Shop",
-                  //   onTap: () {
-                  //     final navWrapper = context.findAncestorStateOfType<NavigationWrapperState>();
-                  //     if (navWrapper != null) {
-                  //       navWrapper.setTabIndex(4); // 👈 jump to the Merchant tab
-                  //     } else {
-                  //       // fallback if somehow opened outside NavigationWrapper
-                  //       Navigator.push(
-                  //         context,
-                  //         MaterialPageRoute(
-                  //           builder: (_) => NavigationWrapper(
-                  //             initialIndex: 4,
-                  //             userModel: widget.userModel,
-                  //           ),
-                  //         ),
-                  //       );
-                  //     }
-                  //   },
-                  // ),
-                  _buildActionButton(
-                    Icons.discount_rounded,
-                    "Vouchers",
-                    onTap: () async {
-                      showMerchantVoucherModal(
-                        context,
-                        "FlexPay",
-                        0, // Default merchant ID for the Vouchers button
-                      );
-                    },
-                  ),
-                  _buildActionButton(
-                    Icons.arrow_downward,
-                    "Top up",
-                    onTap: () async {
-                      final result = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(builder: (_) => TopUpHomePage()),
-                      );
-                      if (result == true) {
-                        context.read<HomeCubit>().fetchUserWallet();
-                      }
-                    },
-                  ),
-                  _buildActionButton(
-                    Icons.account_balance_wallet,
-                    "Withdraw",
-                    onTap: () async {
-                      final result = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(builder: (_) => WithdrawPage()),
-                      );
-                      if (result == true) {
-                        context.read<HomeCubit>().fetchUserWallet();
-                      }
-                    },
-                  ),
-
-                  _buildActionButton(
+                            _buildActionButton(
                     Icons.card_giftcard,
-                    "Shopping",
+                    "Shopping\nWallet",
                     onTap: () async {
                       if (isKapuButtonPressed)
                         return; // Prevent multiple presses
@@ -455,11 +411,16 @@ class _AppBarHomeState extends State<AppBarHome> {
                       );
 
                       try {
-                        // ✅ Check user interaction status FIRST, not wallet data
-                        // Only skip onboarding if user has BOTH visited AND interacted
-                        if (hasVisited && hasInteracted) {
+                        await context
+                            .read<KapuCubit>()
+                            .fetchAllKapuWalletsInstantly();
+                        final state = context.read<KapuCubit>().state;
+
+                        if (state is KapuAllWalletsInstantlyFetched &&
+                            state.walletsResponse.success &&
+                            state.walletsResponse.data.isNotEmpty) {
                           AppLogger.log(
-                            '🟢 [KAPU NAV] User has visited and interacted → navigating directly to PromoCardsSwiperPage',
+                            '🟢 [KAPU NAV] Wallet data exists → navigating directly to PromoCardsSwiperPage',
                           );
                           Navigator.pushAndRemoveUntil(
                             context,
@@ -472,7 +433,7 @@ class _AppBarHomeState extends State<AppBarHome> {
                           );
                         } else {
                           AppLogger.log(
-                            '🟡 [KAPU NAV] User has NOT completed onboarding (visited=$hasVisited, interacted=$hasInteracted) → showing OnBoardKapu',
+                            '🟡 [KAPU NAV] Navigating to OnBoardKapu (user has not interacted yet)',
                           );
                           Navigator.push(
                             context,
@@ -485,6 +446,16 @@ class _AppBarHomeState extends State<AppBarHome> {
                                   );
                                   AppLogger.log(
                                     '✅ [KAPU NAV] User opted in → marking visited and navigating to PromoCardsSwiperPage',
+                                  );
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          PromoCardsSwiperPage(
+                                            userModel: widget.userModel,
+                                          ),
+                                    ),
+                                    (route) => route.isFirst,
                                   );
                                 },
                               ),
@@ -502,16 +473,19 @@ class _AppBarHomeState extends State<AppBarHome> {
                       }
                     },
                   ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Action Button Builder
+  /// Action Button Builder - Updated for the new design
   Widget _buildActionButton(
     IconData icon,
     String label, {
@@ -521,15 +495,27 @@ class _AppBarHomeState extends State<AppBarHome> {
       onTap: onTap,
       child: Column(
         children: [
-          CircleAvatar(
-            backgroundColor: Colors.white24,
-            radius: 24.r,
-            child: Icon(icon, color: Colors.white, size: 24.sp),
+          Container(
+            width: 50.w,
+            height: 50.h,
+            decoration: BoxDecoration(
+              color: const Color(0xFF9ACD32), // Green color from design
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 24.sp,
+            ),
           ),
-          SizedBox(height: 6.h),
+          SizedBox(height: 8.h),
           Text(
             label,
-            style: GoogleFonts.montserrat(color: Colors.white, fontSize: 10.sp),
+            style: GoogleFonts.montserrat(
+              color: Colors.white,
+              fontSize: 9.sp,
+              fontWeight: FontWeight.w500,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

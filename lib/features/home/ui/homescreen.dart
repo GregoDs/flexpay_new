@@ -267,9 +267,9 @@ class _HomeScreenState extends State<HomeScreen>
             color: const Color(0xFF337687),
             child: ListView(
               // STANDARDIZED HORIZONTAL PADDING FOR SETTINGS AND ALIGNMENT
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 4.h),
               children: [
-                SizedBox(height: 8.h),
+                
                 // Refer & Earn Section - positioned above Kapu banner
                 _buildCampaignCard(context),
                 SizedBox(height: 12.h),
@@ -292,80 +292,198 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildCampaignCard(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        _showCampaignModal(context);
-      },
-      // Wrap in Row and Expanded to break right padding
-      child: Row(
+    return Container(
+      padding: EdgeInsets.zero,
+      child: Column(
         children: [
-          Expanded(
-            child: Container(
-              // No right margin or padding, only left
-              margin: EdgeInsets.only(left: 0),
-              padding: EdgeInsets.fromLTRB(20.w, 16.h, 0, 16.h),
-              decoration: BoxDecoration(
-                image: const DecorationImage(
-                  image: AssetImage('assets/images/appbarbackground.png'),
-                  fit: BoxFit.cover,
+          // First row: Savings and Loans
+          Row(
+            children: [
+                Expanded(
+                child: _buildServiceCard(
+                  context: context,
+                  title: 'Refer',
+                  subtitle: 'Go to Service',
+                  icon: Icons.credit_card_outlined,
+                  backgroundColor: const Color(0xFF9BC53D), // Green color for cards
+                  onTap: () => _showCampaignModal(context), // Keep the referral modal for now
                 ),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20.r),
-                  bottomLeft: Radius.circular(20.r),
-                  topRight: Radius.circular(0),
-                  bottomRight: Radius.circular(0),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.10),
-                    blurRadius: 12.r,
-                    spreadRadius: 2.r,
-                    offset: Offset(4, 0), // shadow toward the inside of page
-                  ),
-                ],
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.20),
-                      borderRadius: BorderRadius.circular(12.r),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: _buildServiceCard(
+                  context: context,
+                  title: 'Loans',
+                  subtitle: 'Go to Service',
+                  icon: Icons.account_balance_wallet_outlined,
+                  backgroundColor: const Color(0xFF2E5984), // Blue color for loans
+                  onTap: () => _showComingSoonDialog(context, 'Loans'),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          // Second row: Insurance and Cards
+          Row(
+            children: [
+              Expanded(
+                child: _buildServiceCard(
+                  context: context,
+                  title: 'Contact us',
+                  subtitle: 'Go to Service',
+                  icon: Icons.message,
+                  backgroundColor: const Color(0xFF4A6B7C), // Teal color for insurance
+                  onTap: () => _showComingSoonDialog(context, 'Insurance'),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: _buildServiceCard(
+                  context: context,
+                  title: 'Youtube',
+                  subtitle: 'How to use the app',
+                  icon: Icons.video_collection,
+                  backgroundColor: Colors.red, // Green color for savings
+                  onTap: () => _showComingSoonDialog(context, 'Savings'),
+                ),
+              ),
+              
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color backgroundColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 64.h,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(16.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8.r,
+              spreadRadius: 2.r,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.montserrat(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.sp,
+                        color: Colors.white,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.campaign,
-                      color: Colors.white,
-                      size: 28.sp,
-                    ),
-                  ),
-                  SizedBox(width: 18.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                    SizedBox(height: 2.h),
+                    Row(
                       children: [
                         Text(
-                          'Refer & Earn',
+                          subtitle,
                           style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14.sp,
-                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 8.sp,
+                            color: Colors.white.withOpacity(0.9),
                           ),
                         ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          'Spread the word!\nRefer a friend and earn rewards',
-                          style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 12.sp,
-                            color: Colors.white.withOpacity(0.9),
-                            height: 1.2,
-                          ),
+                        SizedBox(width: 4.w),
+                        Icon(
+                          Icons.arrow_forward,
+                          color: Colors.white.withOpacity(0.9),
+                          size: 12.sp,
                         ),
                       ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 12.sp,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showComingSoonDialog(BuildContext context, String serviceName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: const Color(0xFF337687),
+              size: 24.sp,
+            ),
+            SizedBox(width: 8.w),
+            Text(
+              'Coming Soon!',
+              style: GoogleFonts.montserrat(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF337687),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '$serviceName service will be available soon. Stay tuned for updates!',
+          style: GoogleFonts.montserrat(
+            fontSize: 14.sp,
+            color: Colors.grey[700],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFF337687),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+            ),
+            child: Text(
+              'OK',
+              style: GoogleFonts.montserrat(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
