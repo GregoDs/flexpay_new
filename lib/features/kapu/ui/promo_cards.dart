@@ -17,8 +17,13 @@ enum ViewMode { swiper, list }
 
 class PromoCardsSwiperPage extends StatefulWidget {
   final UserModel? userModel;
+  final String? preselectedMerchantId; // ✅ Add parameter for direct navigation
 
-  const PromoCardsSwiperPage({super.key, this.userModel});
+  const PromoCardsSwiperPage({
+    super.key,
+    this.userModel,
+    this.preselectedMerchantId, // ✅ Add optional preselected merchant
+  });
 
   @override
   State<PromoCardsSwiperPage> createState() => _PromoCardsSwiperPageState();
@@ -81,6 +86,18 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
     _visibleMerchants = List<Map<String, dynamic>>.from(merchants);
     _kapuCubit = KapuCubit(KapuRepo(ApiService()));
 
+    // ✅ Handle preselected merchant navigation
+    int initialPage = 0;
+    if (widget.preselectedMerchantId != null) {
+      final preselectedIndex = merchants.indexWhere(
+        (merchant) => merchant['merchant_id'] == widget.preselectedMerchantId,
+      );
+      if (preselectedIndex != -1) {
+        initialPage = preselectedIndex;
+        _currentPage = initialPage.toDouble();
+      }
+    }
+
     // Add safety check for empty merchants list
     if (merchants.isNotEmpty) {
       final merchantIds = merchants
@@ -93,7 +110,10 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
       }
     }
 
-    _pageController = PageController(viewportFraction: 0.78, initialPage: 0);
+    _pageController = PageController(
+      viewportFraction: 0.78,
+      initialPage: initialPage, // ✅ Use calculated initial page
+    );
 
     _pageController.addListener(() {
       if (_pageController.hasClients && mounted) {
@@ -103,6 +123,18 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
         });
       }
     });
+
+    // ✅ If navigating directly to a merchant, automatically navigate to details after loading
+    if (widget.preselectedMerchantId != null && initialPage != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Wait a bit for the page to settle, then navigate
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && initialPage < merchants.length) {
+            _onMerchantTap(merchants[initialPage], initialPage);
+          }
+        });
+      });
+    }
   }
 
   @override

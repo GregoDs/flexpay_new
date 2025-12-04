@@ -44,6 +44,8 @@ class _AppBarHomeState extends State<AppBarHome> {
   bool isKapuButtonPressed = false;
   bool isDataReady = false;
   double? cachedBalance;
+  bool showRefreshIcon = true;
+  Timer? _refreshIconTimer;
 
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _AppBarHomeState extends State<AppBarHome> {
 
   @override
   void dispose() {
+    _refreshIconTimer?.cancel();
     super.dispose();
   }
 
@@ -77,7 +80,21 @@ class _AppBarHomeState extends State<AppBarHome> {
   void _manualRefresh() {
     setState(() {
       isDataReady = false;
+      showRefreshIcon = false; // Hide the icon immediately
     });
+    
+    // Cancel any existing timer
+    _refreshIconTimer?.cancel();
+    
+    // Start new timer to show icon again after 1 minute
+    _refreshIconTimer = Timer(const Duration(minutes: 1), () {
+      if (mounted) {
+        setState(() {
+          showRefreshIcon = true;
+        });
+      }
+    });
+    
     _fetchInitialData();
   }
 
@@ -274,23 +291,29 @@ class _AppBarHomeState extends State<AppBarHome> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Total Amount',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 12.sp,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            _manualRefresh();
-                          },
-                          child: Icon(
-                            Icons.refresh,
-                            color: Colors.white70,
-                            size: 16.sp,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Total Amount',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12.sp,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            SizedBox(width: 4.w), // Add spacing between text and icon
+                            if (showRefreshIcon)
+                              GestureDetector(
+                                onTap: () {
+                                  _manualRefresh();
+                                },
+                                child: Icon(
+                                  Icons.info_outline,
+                                  color: Colors.yellow,
+                                  size: 12.sp,
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                     ),

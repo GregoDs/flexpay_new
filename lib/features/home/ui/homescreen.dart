@@ -1,8 +1,19 @@
 import 'package:flexpay/features/auth/models/user_model.dart';
 import 'package:flexpay/features/home/ui/appbarhome.dart';
+import 'package:flexpay/features/home/ui/notifications_page.dart';
 import 'package:flexpay/features/home/ui/transactions_home.dart';
 import 'package:flexpay/features/goals/ui/create_goal.dart';
+import 'package:flexpay/features/kapu/cubits/kapu_cubit.dart';
+import 'package:flexpay/features/kapu/cubits/kapu_state.dart';
+import 'package:flexpay/features/kapu/ui/kapu_opt_in.dart';
+import 'package:flexpay/features/kapu/ui/promo_cards.dart';
+import 'package:flexpay/features/navigation/navigation_wrapper.dart';
+import 'package:flexpay/features/payments/ui/topup_home_page.dart';
+import 'package:flexpay/features/payments/ui/voucher_sheet.dart';
+import 'package:flexpay/features/payments/ui/withdraw_home.dart';
+import 'package:flexpay/features/profile/ui/system_menu.dart';
 import 'package:flexpay/gen/colors.gen.dart';
+import 'package:flexpay/utils/cache/shared_preferences_helper.dart';
 import 'package:flexpay/utils/services/logger.dart';
 import 'package:flexpay/utils/widgets/scaffold_messengers.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +24,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flexpay/features/home/cubits/home_cubit.dart';
 import 'package:flexpay/features/home/cubits/home_states.dart';
 import 'package:flexpay/features/home/models/home_transactions_model/transactions_model.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
@@ -36,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool get wantKeepAlive => true;
   List<dynamic> outlets = [];
   bool isLoading = true;
-  List<TransactionData> _transactions =  <TransactionData>[]; 
+  List<TransactionData> _transactions = <TransactionData>[];
   bool _txLoading = false;
   String? _txError;
   bool _isNavigatingToKapu = false;
@@ -51,7 +63,51 @@ class _HomeScreenState extends State<HomeScreen>
   Timer? _imageTimer;
   int _currentImageIndex = 0;
 
- 
+  // ✅ Add shopping wallets data - same as promo cards
+  Map<String, double> _shoppingWalletBalances = {};
+  bool _shoppingWalletsLoading = false;
+  bool _isNavigatingToShoppingWallet = false;
+
+  // ✅ Merchants data - same as in promo_cards.dart
+  static const List<Map<String, dynamic>> _shoppingWalletMerchants = [
+    {
+      'name': 'Jaza Supermarket',
+      'merchant_id': '812',
+      'color': Color(0xFF4DA6FF),
+      'icon': Icons.shopping_bag,
+    },
+    {
+      'name': 'Quickmart Supermarket',
+      'merchant_id': '347',
+      'color': Color(0xFF111111),
+      'icon': Icons.store,
+    },
+    {
+      'name': 'Naivas Supermarket',
+      'merchant_id': '107',
+      'color': Color(0xFFFFB020),
+      'icon': Icons.local_mall,
+    },
+    {
+      'name': 'HotPoint Appliances',
+      'merchant_id': '73',
+      'color': Color(0xFFCD0000),
+      'icon': Icons.devices,
+    },
+    {
+      'name': 'Azone Supermarket',
+      'merchant_id': '727',
+      'color': Color(0xFF6C63FF),
+      'icon': Icons.checkroom,
+    },
+    {
+      'name': 'Open Wallet',
+      'merchant_id': '4',
+      'color': Color(0xFF00A86B),
+      'icon': Icons.account_balance_wallet,
+    },
+  ];
+
   static const List<String> _bannerImages = [
     'assets/images/home_images/gift_box_1.png',
     'assets/images/home_images/gift_box_2.png',
@@ -84,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
 
       final cubit = context.read<HomeCubit>();
+      final kapuCubit = context.read<KapuCubit>();
 
       if (!_walletLoading && cubit.state is! HomeWalletFetched) {
         _walletLoading = true;
@@ -99,11 +156,46 @@ class _HomeScreenState extends State<HomeScreen>
           (_) => setState(() => _txLoading = false),
         );
       }
+
+      // ✅ Fetch shopping wallet balances
+      _fetchShoppingWalletBalances(kapuCubit);
     });
   }
 
+  // ✅ Add method to fetch shopping wallet balances
+  Future<void> _fetchShoppingWalletBalances(KapuCubit kapuCubit) async {
+    if (_shoppingWalletsLoading) return;
+
+    setState(() {
+      _shoppingWalletsLoading = true;
+    });
+
+    try {
+      final merchantIds = _shoppingWalletMerchants
+          .map((merchant) => merchant['merchant_id'] as String)
+          .toList();
+
+      await kapuCubit.fetchMultipleKapuWalletBalances(merchantIds);
+    } catch (e) {
+      AppLogger.log('❌ Error fetching shopping wallet balances: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _shoppingWalletsLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw 'Could not launch $url';
+    }
+  }
+
   void _startImageRotation() {
-    if (_bannerImages.isEmpty) return; 
+    if (_bannerImages.isEmpty) return;
 
     _imageTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted && _bannerImages.isNotEmpty) {
@@ -154,141 +246,558 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Scaffold(
-          appBar: PreferredSize(
-            preferredSize: Size.fromHeight(
-              MediaQuery.of(context).size.height * 0.60,
-            ),
-            child: BlocListener<HomeCubit, HomeState>(
-              listener: (context, state) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Scaffold(
+      body: MultiBlocListener(
+        listeners: [
+          // ✅ Add KapuCubit listener for shopping wallet balances
+          BlocListener<KapuCubit, KapuState>(
+            listener: (context, state) {
+              if (state is KapuWalletListFetched) {
+                // Update shopping wallet balances
+                final balances = <String, double>{};
+                final walletsList = state.wallets;
+
+                for (
+                  int i = 0;
+                  i < walletsList.length && i < _shoppingWalletMerchants.length;
+                  i++
+                ) {
+                  final merchantId =
+                      _shoppingWalletMerchants[i]['merchant_id'] as String;
+                  final balance = walletsList[i].data?.balance ?? 0.0;
+                  balances[merchantId] = balance;
+                }
+
+                setState(() {
+                  _shoppingWalletBalances = balances;
+                });
+              } else if (state is KapuWalletFetched) {
+                // Update individual wallet balance
+                final merchantId = state.merchantId;
+                final newBalance =
+                    state.kapuWalletResponse.data?.balance ?? 0.0;
+                setState(() {
+                  _shoppingWalletBalances[merchantId] = newBalance;
+                });
+              }
+            },
+          ),
+          // Original HomeCubit listener
+          BlocListener<HomeCubit, HomeState>(
+            listener: (context, state) async {
+              AppLogger.log('BlocListener: Current state = $state');
+
+              if (state is HomeWalletFetched) {
+                final walletBalance =
+                    state.walletResponse.data!.walletAccount?.walletBalance;
                 AppLogger.log(
-                  'BlocListener: Current state = $state',
-                ); // Debug log
+                  'Wallet balance fetched: Total Credit = ${walletBalance?.totalCredit}, Total Debit = ${walletBalance?.totalDebit}',
+                );
+                await _ensureMinimumShimmerDuration();
+                setState(() {
+                  _walletFetched = true;
+                  _isLoading = !_walletFetched || !_transactionsFetched;
+                  AppLogger.log('Updated _isLoading = $_isLoading');
+                });
+              }
 
-                if (state is HomeWalletFetched) {
-                  final walletBalance =
-                      state.walletResponse.data!.walletAccount?.walletBalance;
+              if (state is HomeTransactionsFetched) {
+                await _ensureMinimumShimmerDuration();
+                setState(() {
+                  _transactionsFetched = true;
+                  _txLoading = false;
+
+                  final newTransactions = state.transactionsResponse.data;
+                  _transactions = newTransactions.isNotEmpty
+                      ? List<TransactionData>.from(newTransactions)
+                      : <TransactionData>[];
                   AppLogger.log(
-                    'Wallet balance fetched: Total Credit = ${walletBalance?.totalCredit}, Total Debit = ${walletBalance?.totalDebit}',
+                    'Transactions fetched: _transactionsFetched = $_transactionsFetched, count: ${_transactions.length}',
                   );
-                  await _ensureMinimumShimmerDuration(); // Ensure shimmer lasts for 2 seconds
-                  setState(() {
-                    _walletFetched = true; // Mark wallet as fetched
-                    _isLoading =
-                        !_walletFetched ||
-                        !_transactionsFetched; 
-                    AppLogger.log('Updated _isLoading = $_isLoading');
-                  });
-                }
+                  _isLoading = !_walletFetched || !_transactionsFetched;
+                  AppLogger.log('Updated _isLoading = $_isLoading');
+                });
+              }
 
-                if (state is HomeTransactionsFetched) {
-                  await _ensureMinimumShimmerDuration(); 
-                  setState(() {
-                    _transactionsFetched = true; 
-                    _txLoading = false; 
-                  
-                    final newTransactions = state.transactionsResponse.data;
-                    _transactions = newTransactions.isNotEmpty
-                        ? List<TransactionData>.from(newTransactions)
-                        : <TransactionData>[]; 
-                    AppLogger.log(
-                      'Transactions fetched: _transactionsFetched = $_transactionsFetched, count: ${_transactions.length}',
-                    );
-                    _isLoading =
-                        !_walletFetched ||
-                        !_transactionsFetched; 
-                    AppLogger.log('Updated _isLoading = $_isLoading');
-                  });
-                }
+              if (state is HomeWalletLoading ||
+                  state is HomeTransactionsLoading) {
+                setState(() {
+                  _isLoading = true;
+                  AppLogger.log(
+                    'Combined loading started: _isLoading = $_isLoading',
+                  );
+                });
+              }
 
-                if (state is HomeWalletLoading ||
-                    state is HomeTransactionsLoading) {
-                  setState(() {
-                    _isLoading = true;
-                    AppLogger.log(
-                      'Combined loading started: _isLoading = $_isLoading',
-                    );
-                  });
-                }
+              if (state is HomeWalletFailure ||
+                  state is HomeTransactionsFailure) {
+                await _ensureMinimumShimmerDuration();
+                setState(() {
+                  _isLoading = false;
+                  _txLoading = false;
+                  AppLogger.log(
+                    'Combined loading failed: _isLoading = $_isLoading',
+                  );
+                });
+              }
+            },
+          ),
+        ],
+        child: Column(
+          children: [
+            // Fixed header section (Profile + Greeting + Notifications)
+            _buildFixedHeader(context, isDark),
 
-                if (state is HomeWalletFailure ||
-                    state is HomeTransactionsFailure) {
-                  await _ensureMinimumShimmerDuration(); // Ensure shimmer lasts for 2 seconds
-                  setState(() {
-                    _isLoading = false; 
-                    _txLoading = false; 
+            // Scrollable content
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refreshData,
+                color: const Color(0xFF337687),
+                child: CustomScrollView(
+                  slivers: [
+                    // Balance card section
+                    SliverToBoxAdapter(child: _buildBalanceCard(context)),
+
+                    // Main content section
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 20.w,
+                          vertical: 4.h,
+                        ),
+                        child: Column(
+                          children: [
+                            // Christmas banner
+                            // _buildChristmasBanner(context),
+                            // SizedBox(height: 22.h),
+
+                            // Campaign cards
+                            _buildCampaignCard(context),
+                            SizedBox(height: 20.h),
+
+                            // Shopping Wallets Section
+                             _buildShoppingWalletsSection(context),
+                             SizedBox(height: 12.h),
+
+                            // Transactions section
+                            _buildTransactionsSection(context),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFixedHeader(BuildContext context, bool isDark) {
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 20.w,
+        right: 20.w,
+        top: 44.h,
+        bottom: 10.h,
+      ),
+      color: isDark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : Colors.grey[50],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: screenHeight * 0.02),
+
+          // Profile + Greeting + Notifications Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ProfilePage(userModel: widget.userModel),
+                        ),
+                      );
+                    },
+                    child: CircleAvatar(
+                      radius: 22.r,
+                      backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+                      child: Icon(
+                        Icons.person_2,
+                        size: 28.sp,
+                        color: isDark ? Colors.blue[300] : Colors.blue,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getGreetingOnly().replaceAll(', ', ''),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 12.sp,
+                          color: isDark ? Colors.grey[400] : Colors.black54,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      Text(
+                        widget.userModel.user.firstName.toUpperCase(),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20.sp,
+                          color: isDark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  // QR Code Icon
+                  GestureDetector(
+                    onTap: () {
+                      // Add QR code functionality here
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.grey[800]?.withOpacity(0.5)
+                            : Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: Icon(
+                        Icons.qr_code_scanner,
+                        color: isDark ? Colors.grey[300] : Colors.black54,
+                        size: 24.sp,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  // Notifications
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationsPage(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.grey[800]?.withOpacity(0.5)
+                            : Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: Stack(
+                        children: [
+                          Icon(
+                            Icons.notifications_outlined,
+                            color: isDark ? Colors.grey[300] : Colors.black54,
+                            size: 24.sp,
+                          ),
+                          // Red dot for notifications
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              width: 8.w,
+                              height: 8.h,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceCard(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(left: 20.w, right: 20.w, top: 4.h, bottom: 10.h),
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        image: const DecorationImage(
+          image: AssetImage('assets/images/appbarbackground.png'),
+          fit: BoxFit.cover,
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: _buildBalanceCardContent(),
+    );
+  }
+
+  Widget _buildBalanceCardContent() {
+    bool isBalanceVisible = true;
+    bool showRefreshIcon = true;
+    bool isKapuButtonPressed = false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Account Balance header with refresh icon
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Total Amount',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 12.sp,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                SizedBox(width: 4.w),
+                if (showRefreshIcon)
+                  GestureDetector(
+                    onTap: () => _refreshData(),
+                    child: Icon(
+                      Icons.info_outline,
+                      color: Colors.yellow,
+                      size: 12.sp,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+
+        SizedBox(height: 8.h),
+
+        // Balance amount with visibility toggle
+        BlocBuilder<HomeCubit, HomeState>(
+          builder: (context, state) {
+            if (_isLoading) {
+              return Container(
+                height: 40.h,
+                width: 200.w,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              );
+            }
+
+            double? balance;
+            if (state is HomeWalletFetched) {
+              final wallet =
+                  state.walletResponse.data?.walletAccount?.walletBalance;
+              balance = wallet?.balance.toDouble();
+            }
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  balance != null
+                      ? (isBalanceVisible
+                            ? 'KES ${balance.toStringAsFixed(2)}'
+                            : 'KES ******')
+                      : 'KES ******',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 24.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    // Toggle balance visibility - you may need to manage this state
+                  },
+                  child: Icon(
+                    isBalanceVisible ? Icons.visibility : Icons.visibility_off,
+                    color: Colors.white70,
+                    size: 20.sp,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+
+        SizedBox(height: 20.h),
+
+        // Action buttons row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildActionButton(
+              Icons.discount_rounded,
+              "Generate\nVouchers",
+              onTap: () async {
+                showMerchantVoucherModal(
+                  context,
+                  "FlexPay",
+                  0, // Default merchant ID for the Vouchers button
+                );
+              },
+            ),
+
+            _buildActionButton(
+              Icons.arrow_downward,
+              "Top up",
+              onTap: () async {
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(builder: (_) => TopUpHomePage()),
+                );
+                if (result == true) {
+                  context.read<HomeCubit>().fetchUserWallet();
+                }
+              },
+            ),
+
+            _buildActionButton(
+              Icons.arrow_upward,
+              "Withdraw",
+              onTap: () async {
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(builder: (_) => WithdrawPage()),
+                );
+                if (result == true) {
+                  context.read<HomeCubit>().fetchUserWallet();
+                }
+              },
+            ),
+            _buildActionButton(
+              Icons.card_giftcard,
+              "Shopping\nWallet",
+              onTap: () async {
+                if (isKapuButtonPressed) return; // Prevent multiple presses
+                setState(() {
+                  isKapuButtonPressed = true;
+                });
+
+                final userId = widget.userModel.user.id.toString();
+
+                final hasVisited = await SharedPreferencesHelper.hasVisitedKapu(
+                  userId,
+                );
+                final hasUsed = await SharedPreferencesHelper.hasUsedKapu(
+                  userId,
+                );
+                final hasInteracted =
+                    await SharedPreferencesHelper.hasInteractedWithKapu(userId);
+
+                AppLogger.log(
+                  '🔍 [KAPU NAV CHECK] userId=$userId | visited=$hasVisited | used=$hasUsed | interacted=$hasInteracted',
+                );
+
+                try {
+                  await context
+                      .read<KapuCubit>()
+                      .fetchAllKapuWalletsInstantly();
+                  final state = context.read<KapuCubit>().state;
+
+                  if (state is KapuAllWalletsInstantlyFetched &&
+                      state.walletsResponse.success &&
+                      state.walletsResponse.data.isNotEmpty) {
                     AppLogger.log(
-                      'Combined loading failed: _isLoading = $_isLoading',
+                      '🟢 [KAPU NAV] Wallet data exists → navigating directly to PromoCardsSwiperPage',
                     );
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            PromoCardsSwiperPage(userModel: widget.userModel),
+                      ),
+                      (route) => route.isFirst,
+                    );
+                  } else {
+                    AppLogger.log(
+                      '🟡 [KAPU NAV] Navigating to OnBoardKapu (user has not interacted yet)',
+                    );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OnBoardKapu(
+                          userModel: widget.userModel,
+                          onOptIn: () async {
+                            await SharedPreferencesHelper.markKapuVisited(
+                              userId,
+                            );
+                            AppLogger.log(
+                              '✅ [KAPU NAV] User opted in → marking visited and navigating to PromoCardsSwiperPage',
+                            );
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PromoCardsSwiperPage(
+                                  userModel: widget.userModel,
+                                ),
+                              ),
+                              (route) => route.isFirst,
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  AppLogger.log('❌ [KAPU NAV] Error during navigation: $e');
+                } finally {
+                  setState(() {
+                    isKapuButtonPressed = false; // Reset the flag
                   });
                 }
               },
-              child: AppBarHome(
-                context,
-                userName: "${widget.userModel.user.firstName}",
-                userModel: widget.userModel,
-                isDataReady:
-                    !_isLoading, // Use combined loading flag to control shimmer
-                onWalletBalanceMissing: () {
-                  // Add a fallback UI or refetch option
-                  AppLogger.log(
-                    'Wallet balance missing in UI. Prompting user to refetch.',
-                  );
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text('Wallet Balance Missing'),
-                      content: Text(
-                        'Your wallet balance is not visible. Would you like to refetch it?',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            context.read<HomeCubit>().fetchUserWallet();
-                          },
-                          child: Text('Refetch'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text('Cancel'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
             ),
-          ),
-          body: RefreshIndicator(
-            onRefresh: _refreshData,
-            color: const Color(0xFF337687),
-            child: ListView(
-              // STANDARDIZED HORIZONTAL PADDING FOR SETTINGS AND ALIGNMENT
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 4.h),
-              children: [
-                
-                // Refer & Earn Section - positioned above Kapu banner
-                _buildCampaignCard(context),
-                SizedBox(height: 12.h),
-
-                // 🎅 Xmas Kapu Promo Banner
-                _buildChristmasBanner(context),
-
-                SizedBox(height: 20.h),
-                // VoucherModalSheet(context: context),
-                // SizedBox(height: 8.h),
-                // _buildMerchantImages(context),
-                // SizedBox(height: 8.h),
-                _buildTransactionsSection(context),
-              ],
-            ),
-          ),
-        );
-      },
+          ],
+        ),
+      ],
     );
+  }
+
+  String _getGreetingOnly() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return "Good morning, ";
+    } else if (hour < 17) {
+      return "Good afternoon, ";
+    } else {
+      return "Good evening, ";
+    }
   }
 
   Widget _buildCampaignCard(BuildContext context) {
@@ -299,14 +808,18 @@ class _HomeScreenState extends State<HomeScreen>
           // First row: Savings and Loans
           Row(
             children: [
-                Expanded(
+              Expanded(
                 child: _buildServiceCard(
                   context: context,
                   title: 'Refer',
-                  subtitle: 'Go to Service',
+                  subtitle: 'Share and earn rewards',
                   icon: Icons.credit_card_outlined,
-                  backgroundColor: const Color(0xFF9BC53D), // Green color for cards
-                  onTap: () => _showCampaignModal(context), // Keep the referral modal for now
+                  backgroundColor: const Color(
+                    0xFF9BC53D,
+                  ), // Green color for cards
+                  onTap: () => _showCampaignModal(
+                    context,
+                  ), // Keep the referral modal for now
                 ),
               ),
               SizedBox(width: 12.w),
@@ -314,42 +827,54 @@ class _HomeScreenState extends State<HomeScreen>
                 child: _buildServiceCard(
                   context: context,
                   title: 'Loans',
-                  subtitle: 'Go to Service',
+                  subtitle: 'Click to borrow',
                   icon: Icons.account_balance_wallet_outlined,
-                  backgroundColor: const Color(0xFF2E5984), // Blue color for loans
-                  onTap: () => _showComingSoonDialog(context, 'Loans'),
+                  backgroundColor: const Color(0xFF2E5984),
+                  onTap: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    }
+                    final NavigationWrapperState? navState = context
+                        .findAncestorStateOfType<NavigationWrapperState>();
+                    if (navState != null) {
+                      navState.setTabIndex(3);
+                    }
+                  },
                 ),
               ),
             ],
           ),
-          SizedBox(height: 12.h),
+          // SizedBox(height: 12.h),
           // Second row: Insurance and Cards
-          Row(
-            children: [
-              Expanded(
-                child: _buildServiceCard(
-                  context: context,
-                  title: 'Contact us',
-                  subtitle: 'Go to Service',
-                  icon: Icons.message,
-                  backgroundColor: const Color(0xFF4A6B7C), // Teal color for insurance
-                  onTap: () => _showComingSoonDialog(context, 'Insurance'),
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: _buildServiceCard(
-                  context: context,
-                  title: 'Youtube',
-                  subtitle: 'How to use the app',
-                  icon: Icons.video_collection,
-                  backgroundColor: Colors.red, // Green color for savings
-                  onTap: () => _showComingSoonDialog(context, 'Savings'),
-                ),
-              ),
-              
-            ],
-          ),
+          // Row(
+          //   children: [
+          //     Expanded(
+          //       child: _buildServiceCard(
+          //         context: context,
+          //         title: 'Contact us',
+          //         subtitle: 'Call us now for inquiries',
+          //         icon: Icons.message,
+          //         backgroundColor: const Color(
+          //           0xFF4A6B7C,
+          //         ), // Teal color for insurance
+          //         onTap: () => _launchURL('https://wa.me/254759687055'),
+          //       ),
+          //     ),
+          //     SizedBox(width: 12.w),
+          //     Expanded(
+          //       child: _buildServiceCard(
+          //         context: context,
+          //         title: 'Youtube',
+          //         subtitle: 'How to use the app',
+          //         icon: Icons.video_collection,
+          //         backgroundColor: Colors.red,
+          //         onTap: () => _launchURL(
+          //           'https://www.youtube.com/@flexpaylipiapolepole',
+          //         ),
+          //       ),
+          //     ),
+          //   ],
+          // ),
         ],
       ),
     );
@@ -425,11 +950,7 @@ class _HomeScreenState extends State<HomeScreen>
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12.r),
                 ),
-                child: Icon(
-                  icon,
-                  color: Colors.white,
-                  size: 12.sp,
-                ),
+                child: Icon(icon, color: Colors.white, size: 12.sp),
               ),
             ],
           ),
@@ -856,7 +1377,7 @@ class _HomeScreenState extends State<HomeScreen>
               child: Text(
                 'View All',
                 style: GoogleFonts.montserrat(
-                  color: Color(0xFF7CAA23),
+                  color: const Color(0xFF7CAA23),
                   fontWeight: FontWeight.w700,
                   fontSize: 12.sp,
                 ),
@@ -864,7 +1385,9 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ],
         ),
-        SizedBox(height: 14.h),
+
+        SizedBox(height: 6.h),
+
         if (_isLoading || _txLoading) ...[
           Center(child: SpinKitWave(color: ColorName.primaryColor, size: 24)),
         ] else if (_transactions.isEmpty)
@@ -878,37 +1401,261 @@ class _HomeScreenState extends State<HomeScreen>
             textAlign: TextAlign.center,
           )
         else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _transactions.isNotEmpty
-                ? _transactions.length.clamp(0, 5)
-                : 0, // Additional safety check
+          MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _transactions.isNotEmpty
+                  ? _transactions.length.clamp(0, 5)
+                  : 0,
+              itemBuilder: (context, index) {
+                if (index >= _transactions.length) {
+                  return const SizedBox.shrink();
+                }
+
+                final tx = _transactions[index];
+                final isIncome = tx.paymentAmount >= 0;
+                final amountText = _formatAmount(
+                  tx.paymentAmount,
+                  prefix: 'KES ',
+                );
+                final status = 'Successful';
+
+                return _buildTransactionTile(
+                  tx,
+                  amountText,
+                  isIncome,
+                  status,
+                  context,
+                );
+              },
+            ),
+          ),
+
+        // Add spacing before shopping wallets section
+        // SizedBox(height: 12.h),
+
+       
+      ],
+    );
+  }
+
+  Widget _buildShoppingWalletsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Shopping Wallets',
+              style: GoogleFonts.montserrat(
+                fontWeight: FontWeight.w600,
+                fontSize: 14.sp,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                // Navigate to all shopping wallets page
+                // TODO: Implement navigation to full shopping wallets page
+              },
+              child: Text(
+                'View All',
+                style: GoogleFonts.montserrat(
+                  color: const Color(0xFF7CAA23),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.sp,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        SizedBox(height: 16.h),
+
+        // Horizontal scrollable shopping wallet cards
+        SizedBox(
+          height: 160.h,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: _shoppingWalletMerchants.length,
             itemBuilder: (context, index) {
-              // Add bounds checking
-              if (index >= _transactions.length) {
-                return const SizedBox.shrink();
-              }
-
-              final tx = _transactions[index];
-
-              final isIncome = tx.paymentAmount >= 0;
-              final amountText = _formatAmount(
-                tx.paymentAmount,
-                prefix: 'KES ',
-              );
-              // Dummy status for now:
-              final status = 'Successful';
-              return _buildTransactionTile(
-                tx,
-                amountText,
-                isIncome,
-                status,
+              final merchant = _shoppingWalletMerchants[index];
+              final balance =
+                  _shoppingWalletBalances[merchant['merchant_id']] ?? 0.0;
+              return _buildShoppingWalletCard(
                 context,
+                merchant['name'],
+                'KES ${balance.toStringAsFixed(2)}',
+                merchant['icon'],
+                merchant['color'],
+                index,
               );
             },
           ),
+        ),
+
+        // Add bottom spacing
+        SizedBox(height: 20.h),
       ],
+    );
+  }
+
+  Widget _buildShoppingWalletCard(
+    BuildContext context,
+    String title,
+    String balance,
+    IconData icon,
+    Color accentColor,
+    int index,
+  ) {
+    return GestureDetector(
+      onTap: () async {
+        if (_isNavigatingToShoppingWallet) return;
+        setState(() => _isNavigatingToShoppingWallet = true);
+
+        try {
+          final merchant = _shoppingWalletMerchants[index];
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PromoCardsSwiperPage(
+                userModel: widget.userModel,
+                preselectedMerchantId: merchant['merchant_id'],
+              ),
+            ),
+          );
+        } catch (e) {
+          AppLogger.log('❌ [SHOPPING WALLET NAV ERROR] $e');
+        } finally {
+          if (mounted) setState(() => _isNavigatingToShoppingWallet = false);
+        }
+      },
+      child: Container(
+        width: 240.w,
+        margin: EdgeInsets.only(right: 16.w),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16.r),
+          image: const DecorationImage(
+            image: AssetImage('assets/images/appbarbackground.png'),
+            fit: BoxFit.cover,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 12.r,
+              spreadRadius: 2.r,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Container(
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16.r),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.black.withOpacity(0.2), Colors.transparent],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Top section with icon and title
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 20.sp),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 4.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Text(
+                      'Active',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 8.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              SizedBox(height: 12.h),
+
+              // Title
+              Text(
+                title,
+                style: GoogleFonts.montserrat(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+
+              // Balance
+              Text(
+                balance,
+                style: GoogleFonts.montserrat(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    IconData icon,
+    String label, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 24.r,
+            child: Icon(icon, color: Colors.white, size: 24.sp),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            label,
+            style: GoogleFonts.montserrat(color: Colors.white, fontSize: 13.sp),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -919,18 +1666,17 @@ class _HomeScreenState extends State<HomeScreen>
     String status,
     BuildContext context,
   ) {
-    // Visual style to match screenshot card
     Color circleColor = isIncome
         ? const Color(0xFF7CAA23)
         : const Color(0xFF7CAA23);
     Color statusColor = status == 'Successful'
         ? const Color(0xFF7CAA23)
         : Colors.redAccent;
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 6.h),
       child: GestureDetector(
         onTap: () {
-          // Open all transactions with the same smooth animation
           if (_transactions.isNotEmpty) {
             Navigator.of(context).push(
               _createSlideUpRoute(List<TransactionData>.from(_transactions)),
@@ -946,7 +1692,7 @@ class _HomeScreenState extends State<HomeScreen>
               width: 1.4,
             ),
           ),
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -964,8 +1710,8 @@ class _HomeScreenState extends State<HomeScreen>
                   size: 28.sp,
                 ),
               ),
-              SizedBox(width: 15.w),
-              // Details
+              SizedBox(width: 12.w),
+
               Expanded(
                 flex: 4,
                 child: Column(
@@ -980,18 +1726,18 @@ class _HomeScreenState extends State<HomeScreen>
                         color: Colors.black,
                       ),
                     ),
-                    SizedBox(height: 3.h),
+                    SizedBox(height: 2.h),
                     Text(
                       tx.date,
                       style: GoogleFonts.montserrat(
-                        fontSize: 14.sp,
+                        fontSize: 13.sp,
                         color: Colors.grey.shade600,
                       ),
                     ),
                   ],
                 ),
               ),
-              // Amount and status
+
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -1004,19 +1750,13 @@ class _HomeScreenState extends State<HomeScreen>
                       color: Colors.black,
                     ),
                   ),
-                  SizedBox(height: 3.h),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 0,
-                      vertical: 2.5.h,
-                    ),
-                    child: Text(
-                      status,
-                      style: GoogleFonts.montserrat(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w500,
-                        color: statusColor,
-                      ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    status,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w500,
+                      color: statusColor,
                     ),
                   ),
                 ],
@@ -1027,44 +1767,39 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
+}
 
-  String _formatAmount(double value, {String prefix = ''}) {
-    final isNegative = value < 0;
-    final abs = value.abs();
-    final hasCents = abs.truncateToDouble() != abs;
-    final text = hasCents ? abs.toStringAsFixed(2) : abs.toStringAsFixed(0);
-    final signed = isNegative ? '-$prefix$text' : '+$prefix$text';
-    return signed;
-  }
+String _formatAmount(double value, {String prefix = ''}) {
+  final isNegative = value < 0;
+  final abs = value.abs();
+  final hasCents = abs.truncateToDouble() != abs;
+  final text = hasCents ? abs.toStringAsFixed(2) : abs.toStringAsFixed(0);
+  final signed = isNegative ? '-$prefix$text' : '+$prefix$text';
+  return signed;
+}
 
-  Route _createSlideUpRoute(List<TransactionData> transactions) {
-    // Add null safety check
-    if (transactions.isEmpty) {
-      return MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(title: Text('No Transactions')),
-          body: Center(child: Text('No transactions available')),
-        ),
-      );
-    }
-
-    return PageRouteBuilder(
-      transitionDuration: const Duration(
-        milliseconds: 700,
-      ), // smoother & slower
-      pageBuilder: (context, animation, secondaryAnimation) =>
-          TransactionDetailsPage(transactions: transactions),
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        var begin = const Offset(0.0, 1.0);
-        var end = Offset.zero;
-        var curve = Curves.easeInOutCubicEmphasized; // ultra smooth, modern
-
-        var tween = Tween(
-          begin: begin,
-          end: end,
-        ).chain(CurveTween(curve: curve));
-        return SlideTransition(position: animation.drive(tween), child: child);
-      },
+Route _createSlideUpRoute(List<TransactionData> transactions) {
+  if (transactions.isEmpty) {
+    return MaterialPageRoute(
+      builder: (context) => Scaffold(
+        appBar: AppBar(title: Text('No Transactions')),
+        body: Center(child: Text('No transactions available')),
+      ),
     );
   }
+
+  return PageRouteBuilder(
+    transitionDuration: const Duration(milliseconds: 700),
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        TransactionDetailsPage(transactions: transactions),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      var begin = const Offset(0.0, 1.0);
+      var end = Offset.zero;
+      var curve = Curves.easeInOutCubicEmphasized;
+
+      var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+      return SlideTransition(position: animation.drive(tween), child: child);
+    },
+  );
 }
