@@ -35,6 +35,7 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
       false; // Changed from true to false - show balances by default
   bool _hasFetchedOnce = false;
   bool _isNavigating = false;
+  bool _isRefreshing = false; // Add refresh state
 
   // Add view mode state
   ViewMode _currentViewMode = ViewMode.list;
@@ -202,116 +203,107 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
         child: Scaffold(
           backgroundColor: bgColor,
           body: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 22.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // top row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _circleIcon(
-                        context,
-                        icon: Icons.arrow_back_ios_new_rounded,
-                        onTap: () {
-                          Navigator.pop(context, false);
-                        },
-                      ),
-                      Text(
-                        'Christmas Kapu'.toUpperCase(),
-                        style: subtitleStyle.copyWith(letterSpacing: 1.6),
-                      ),
-                      Text(
-                        '${(_currentPage.round() + 1)}/${merchants.length}',
-                        style: subtitleStyle,
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 18.h),
-
-                  Text.rich(
-                    TextSpan(
-                      text: 'Start saving for\n',
+            child: RefreshIndicator(
+              onRefresh: _refreshBalances, // Add refresh logic
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 22.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // top row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        TextSpan(
-                          text: 'your next shopping ',
-                          style: headlineStyle,
+                        _circleIcon(
+                          context,
+                          icon: Icons.arrow_back_ios_new_rounded,
+                          onTap: () {
+                            Navigator.pop(context, false);
+                          },
                         ),
-                        TextSpan(
-                          text: 'and earn cash back rewards 🎅',
-                          style: headlineStyle.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Text(
+                          'Christmas Kapu'.toUpperCase(),
+                          style: subtitleStyle.copyWith(letterSpacing: 1.6),
+                        ),
+                        Text(
+                          '${(_currentPage.round() + 1)}/${merchants.length}',
+                          style: subtitleStyle,
                         ),
                       ],
-                      style: headlineStyle,
                     ),
-                  ),
 
-                  SizedBox(height: 26.h),
+                    SizedBox(height: 18.h),
 
-                  // Add view mode toggle button with better styling
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _currentViewMode == ViewMode.swiper
-                            ? 'Swipe View'
-                            : 'List View',
-                        style: subtitleStyle.copyWith(fontSize: 12.sp),
+                    Text.rich(
+                      TextSpan(
+                        text: 'Start saving for\n',
+                        children: [
+                          TextSpan(
+                            text: 'your next shopping ',
+                            style: headlineStyle,
+                          ),
+                          TextSpan(
+                            text: 'and earn cash back rewards 🎅',
+                            style: headlineStyle.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        style: headlineStyle,
                       ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF1E1E1E)
-                              : const Color(0xFFF6F7F9),
-                          borderRadius: BorderRadius.circular(20.r),
-                          border: isDark
-                              ? Border.all(color: Colors.grey[700]!, width: 0.5)
-                              : null,
+                    ),
+
+                    SizedBox(height: 26.h),
+
+                    // Add view mode toggle button with better styling
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _currentViewMode == ViewMode.swiper
+                              ? 'Swipe View'
+                              : 'List View',
+                          style: subtitleStyle.copyWith(fontSize: 12.sp),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _currentViewMode = ViewMode.swiper;
-                                });
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12.w,
-                                  vertical: 8.h,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _currentViewMode == ViewMode.swiper
-                                      ? (isDark ? Colors.white : Colors.black)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(16.r),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.view_carousel,
-                                      size: 16.sp,
-                                      color: _currentViewMode == ViewMode.swiper
-                                          ? (isDark
-                                                ? Colors.black
-                                                : Colors.white)
-                                          : (isDark
-                                                ? Colors.white
-                                                : Colors.black),
-                                    ),
-                                    SizedBox(width: 4.w),
-                                    Text(
-                                      'Cards',
-                                      style: GoogleFonts.montserrat(
-                                        fontSize: 12.sp,
-                                        fontWeight: FontWeight.w500,
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF1E1E1E)
+                                : const Color(0xFFF6F7F9),
+                            borderRadius: BorderRadius.circular(20.r),
+                            border: isDark
+                                ? Border.all(
+                                    color: Colors.grey[700]!,
+                                    width: 0.5,
+                                  )
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _currentViewMode = ViewMode.swiper;
+                                  });
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 8.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _currentViewMode == ViewMode.swiper
+                                        ? (isDark ? Colors.white : Colors.black)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16.r),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.view_carousel,
+                                        size: 16.sp,
                                         color:
                                             _currentViewMode == ViewMode.swiper
                                             ? (isDark
@@ -321,48 +313,50 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
                                                   ? Colors.white
                                                   : Colors.black),
                                       ),
-                                    ),
-                                  ],
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        'Cards',
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 12.sp,
+                                          fontWeight: FontWeight.w500,
+                                          color:
+                                              _currentViewMode ==
+                                                  ViewMode.swiper
+                                              ? (isDark
+                                                    ? Colors.black
+                                                    : Colors.white)
+                                              : (isDark
+                                                    ? Colors.white
+                                                    : Colors.black),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _currentViewMode = ViewMode.list;
-                                });
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12.w,
-                                  vertical: 8.h,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _currentViewMode == ViewMode.list
-                                      ? (isDark ? Colors.white : Colors.black)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(16.r),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.view_list,
-                                      size: 16.sp,
-                                      color: _currentViewMode == ViewMode.list
-                                          ? (isDark
-                                                ? Colors.black
-                                                : Colors.white)
-                                          : (isDark
-                                                ? Colors.white
-                                                : Colors.black),
-                                    ),
-                                    SizedBox(width: 4.w),
-                                    Text(
-                                      'List',
-                                      style: GoogleFonts.montserrat(
-                                        fontSize: 12.sp,
-                                        fontWeight: FontWeight.w500,
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _currentViewMode = ViewMode.list;
+                                  });
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 8.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _currentViewMode == ViewMode.list
+                                        ? (isDark ? Colors.white : Colors.black)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16.r),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.view_list,
+                                        size: 16.sp,
                                         color: _currentViewMode == ViewMode.list
                                             ? (isDark
                                                   ? Colors.black
@@ -371,46 +365,62 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
                                                   ? Colors.white
                                                   : Colors.black),
                                       ),
-                                    ),
-                                  ],
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        'List',
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 12.sp,
+                                          fontWeight: FontWeight.w500,
+                                          color:
+                                              _currentViewMode == ViewMode.list
+                                              ? (isDark
+                                                    ? Colors.black
+                                                    : Colors.white)
+                                              : (isDark
+                                                    ? Colors.white
+                                                    : Colors.black),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    Expanded(
+                      child: BlocBuilder<KapuCubit, KapuState>(
+                        builder: (context, state) {
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 600),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder: (child, anim) =>
+                                FadeTransition(opacity: anim, child: child),
+                            child: _buildStateChild(state),
+                          );
+                        },
+                      ),
+                    ),
+
+                    Center(
+                      child: Text(
+                        _currentViewMode == ViewMode.swiper
+                            ? 'Swipe to view more'
+                            : 'Scroll to see all merchants',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 12.sp,
+                          color: Colors.grey[500],
                         ),
                       ),
-                    ],
-                  ),
-
-                  Expanded(
-                    child: BlocBuilder<KapuCubit, KapuState>(
-                      builder: (context, state) {
-                        return AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 600),
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeIn,
-                          transitionBuilder: (child, anim) =>
-                              FadeTransition(opacity: anim, child: child),
-                          child: _buildStateChild(state),
-                        );
-                      },
                     ),
-                  ),
 
-                  Center(
-                    child: Text(
-                      _currentViewMode == ViewMode.swiper
-                          ? 'Swipe to view more'
-                          : 'Scroll to see all merchants',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 12.sp,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: 20.h),
-                ],
+                    SizedBox(height: 20.h),
+                  ],
+                ),
               ),
             ),
           ),
@@ -972,5 +982,26 @@ class _PromoCardsSwiperPageState extends State<PromoCardsSwiperPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _refreshBalances() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    final merchantIds = merchants
+        .map((m) => m['merchant_id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    if (merchantIds.isNotEmpty) {
+      await _kapuCubit.fetchMultipleKapuWalletBalances(merchantIds);
+    }
+
+    setState(() {
+      _isRefreshing = false;
+    });
   }
 }

@@ -53,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen>
   String? _txError;
   bool _isNavigatingToKapu = false;
   bool _walletLoading = false;
+  bool isKapuButtonPressed = false; // Added to prevent multiple presses
   bool _isLoading = true;
 
   bool _walletFetched = false;
@@ -295,9 +296,85 @@ class _HomeScreenState extends State<HomeScreen>
     {
       'icon': Icons.card_giftcard,
       'label': "Shopping\nWallet",
-      'onTap': () async {
-        // Your existing shopping wallet onTap logic here
-      },
+      'onTap' : () async {
+                if (isKapuButtonPressed) return; // Prevent multiple presses
+                setState(() {
+                  isKapuButtonPressed = true;
+                });
+
+                final userId = widget.userModel.user.id.toString();
+
+                final hasVisited = await SharedPreferencesHelper.hasVisitedKapu(
+                  userId,
+                );
+                final hasUsed = await SharedPreferencesHelper.hasUsedKapu(
+                  userId,
+                );
+                final hasInteracted =
+                    await SharedPreferencesHelper.hasInteractedWithKapu(userId);
+
+                AppLogger.log(
+                  '🔍 [KAPU NAV CHECK] userId=$userId | visited=$hasVisited | used=$hasUsed | interacted=$hasInteracted',
+                );
+
+                try {
+                  await context
+                      .read<KapuCubit>()
+                      .fetchAllKapuWalletsInstantly();
+                  final state = context.read<KapuCubit>().state;
+
+                  if (state is KapuAllWalletsInstantlyFetched &&
+                      state.walletsResponse.success &&
+                      state.walletsResponse.data.isNotEmpty) {
+                    AppLogger.log(
+                      '🟢 [KAPU NAV] Wallet data exists → navigating directly to PromoCardsSwiperPage',
+                    );
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            PromoCardsSwiperPage(userModel: widget.userModel),
+                      ),
+                      (route) => route.isFirst,
+                    );
+                  } else {
+                    AppLogger.log(
+                      '🟡 [KAPU NAV] Navigating to OnBoardKapu (user has not interacted yet)',
+                    );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OnBoardKapu(
+                          userModel: widget.userModel,
+                          onOptIn: () async {
+                            await SharedPreferencesHelper.markKapuVisited(
+                              userId,
+                            );
+                            AppLogger.log(
+                              '✅ [KAPU NAV] User opted in → marking visited and navigating to PromoCardsSwiperPage',
+                            );
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PromoCardsSwiperPage(
+                                  userModel: widget.userModel,
+                                ),
+                              ),
+                              (route) => route.isFirst,
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  AppLogger.log('❌ [KAPU NAV] Error during navigation: $e');
+                } finally {
+                  setState(() {
+                    isKapuButtonPressed = false; // Reset the flag
+                  });
+                }
+              },
     },
     {
       'icon': Icons.credit_card_outlined,
