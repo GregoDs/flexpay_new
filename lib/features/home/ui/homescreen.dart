@@ -117,8 +117,9 @@ class _HomeScreenState extends State<HomeScreen>
     'assets/images/home_images/shopping_trolley.png',
   ];
 
-  PageController _pageController = PageController();
-  int _currentCardIndex = 0;
+  PageController _actionButtonsController = PageController();
+  int _currentActionPage = 0;
+  final int _itemsPerPage = 4; // Number of action buttons per page
 
   @override
   void initState() {
@@ -222,6 +223,7 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _bannerAnimationController.dispose();
     _imageTimer?.cancel();
+    _actionButtonsController.dispose();
     super.dispose();
   }
 
@@ -233,6 +235,8 @@ class _HomeScreenState extends State<HomeScreen>
       _isLoading = true;
       _txLoading = true;
       _txError = null;
+      _isBalanceVisible = true;
+
     });
 
     final cubit = context.read<HomeCubit>();
@@ -247,6 +251,85 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _ensureMinimumShimmerDuration() async {
     await Future.delayed(const Duration(seconds: 2));
   }
+
+
+  List<Map<String, dynamic>> _getAllActionButtons() {
+  return [
+    {
+      'icon': Icons.discount_rounded,
+      'label': "Generate\nVouchers",
+      'onTap': () async {
+        showMerchantVoucherModal(
+          context,
+          "FlexPay",
+          0,
+        );
+      },
+    },
+    {
+      'icon': Icons.arrow_downward,
+      'label': "Top up",
+      'onTap': () async {
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => TopUpHomePage()),
+        );
+        if (result == true) {
+          context.read<HomeCubit>().fetchUserWallet();
+        }
+      },
+    },
+    {
+      'icon': Icons.arrow_upward,
+      'label': "Withdraw",
+      'onTap': () async {
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => WithdrawPage()),
+        );
+        if (result == true) {
+          context.read<HomeCubit>().fetchUserWallet();
+        }
+      },
+    },
+    {
+      'icon': Icons.card_giftcard,
+      'label': "Shopping\nWallet",
+      'onTap': () async {
+        // Your existing shopping wallet onTap logic here
+      },
+    },
+    {
+      'icon': Icons.credit_card_outlined,
+      'label': "Refer",
+      'onTap': () => _showCampaignModal(context),
+    },
+    {
+      'icon': Icons.video_collection,
+      'label': "Youtube",
+      'onTap': () => _launchURL('https://www.youtube.com/@flexpaylipiapolepole'),
+    },
+    {
+      'icon': Icons.account_balance_wallet_outlined,
+      'label': "Loans",
+      'onTap': () {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+        final NavigationWrapperState? navState = context
+            .findAncestorStateOfType<NavigationWrapperState>();
+        if (navState != null) {
+          navState.setTabIndex(3);
+        }
+      },
+    },
+    {
+      'icon': Icons.call,
+      'label': "Call",
+      'onTap': () => _launchURL('https://wa.me/254759687055'),
+    },
+  ];
+}
 
   @override
   Widget build(BuildContext context) {
@@ -625,7 +708,7 @@ class _HomeScreenState extends State<HomeScreen>
             if (state is HomeWalletInitial || state is HomeWalletLoading) {
               // Show shimmer
               return Container(
-                height: 40.h,
+                height: 20.h,
                 width: 200.w,
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.3),
@@ -683,136 +766,11 @@ class _HomeScreenState extends State<HomeScreen>
           },
         ),
 
-        SizedBox(height: 20.h),
+        SizedBox(height: 32.h),
 
         // Action buttons row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildActionButton(
-              Icons.discount_rounded,
-              "Generate\nVouchers",
-              onTap: () async {
-                showMerchantVoucherModal(
-                  context,
-                  "FlexPay",
-                  0, // Default merchant ID for the Vouchers button
-                );
-              },
-            ),
-
-            _buildActionButton(
-              Icons.arrow_downward,
-              "Top up",
-              onTap: () async {
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(builder: (_) => TopUpHomePage()),
-                );
-                if (result == true) {
-                  context.read<HomeCubit>().fetchUserWallet();
-                }
-              },
-            ),
-
-            _buildActionButton(
-              Icons.arrow_upward,
-              "Withdraw",
-              onTap: () async {
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(builder: (_) => WithdrawPage()),
-                );
-                if (result == true) {
-                  context.read<HomeCubit>().fetchUserWallet();
-                }
-              },
-            ),
-            _buildActionButton(
-              Icons.card_giftcard,
-              "Shopping\nWallet",
-              onTap: () async {
-                if (isKapuButtonPressed) return; // Prevent multiple presses
-                setState(() {
-                  isKapuButtonPressed = true;
-                });
-
-                final userId = widget.userModel.user.id.toString();
-
-                final hasVisited = await SharedPreferencesHelper.hasVisitedKapu(
-                  userId,
-                );
-                final hasUsed = await SharedPreferencesHelper.hasUsedKapu(
-                  userId,
-                );
-                final hasInteracted =
-                    await SharedPreferencesHelper.hasInteractedWithKapu(userId);
-
-                AppLogger.log(
-                  '🔍 [KAPU NAV CHECK] userId=$userId | visited=$hasVisited | used=$hasUsed | interacted=$hasInteracted',
-                );
-
-                try {
-                  await context
-                      .read<KapuCubit>()
-                      .fetchAllKapuWalletsInstantly();
-                  final state = context.read<KapuCubit>().state;
-
-                  if (state is KapuAllWalletsInstantlyFetched &&
-                      state.walletsResponse.success &&
-                      state.walletsResponse.data.isNotEmpty) {
-                    AppLogger.log(
-                      '🟢 [KAPU NAV] Wallet data exists → navigating directly to PromoCardsSwiperPage',
-                    );
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            PromoCardsSwiperPage(userModel: widget.userModel),
-                      ),
-                      (route) => route.isFirst,
-                    );
-                  } else {
-                    AppLogger.log(
-                      '🟡 [KAPU NAV] Navigating to OnBoardKapu (user has not interacted yet)',
-                    );
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OnBoardKapu(
-                          userModel: widget.userModel,
-                          onOptIn: () async {
-                            await SharedPreferencesHelper.markKapuVisited(
-                              userId,
-                            );
-                            AppLogger.log(
-                              '✅ [KAPU NAV] User opted in → marking visited and navigating to PromoCardsSwiperPage',
-                            );
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PromoCardsSwiperPage(
-                                  userModel: widget.userModel,
-                                ),
-                              ),
-                              (route) => route.isFirst,
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  AppLogger.log('❌ [KAPU NAV] Error during navigation: $e');
-                } finally {
-                  setState(() {
-                    isKapuButtonPressed = false; // Reset the flag
-                  });
-                }
-              },
-            ),
-          ],
-        ),
+        _buildScrollableActionButtons(),
+        
       ],
     );
   }
@@ -827,6 +785,109 @@ class _HomeScreenState extends State<HomeScreen>
       return "Good evening, ";
     }
   }
+
+
+
+  Widget _buildActionButton(
+    IconData icon,
+    String label, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 24.r,
+            child: Icon(icon, color: Colors.white, size: 24.sp),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            label,
+            style: GoogleFonts.montserrat(color: Colors.white, fontSize: 13.sp),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildScrollableActionButtons() {
+  final allButtons = _getAllActionButtons();
+  final totalPages = (allButtons.length / _itemsPerPage).ceil();
+  
+  return Column(
+    children: [
+      SizedBox(
+        height: 94.h, 
+        child: PageView.builder(
+          controller: _actionButtonsController,
+          onPageChanged: (page) {
+            setState(() {
+              _currentActionPage = page;
+            });
+          },
+          itemCount: totalPages,
+          itemBuilder: (context, pageIndex) {
+            final startIndex = pageIndex * _itemsPerPage;
+            final endIndex = (startIndex + _itemsPerPage).clamp(0, allButtons.length);
+            final pageButtons = allButtons.sublist(startIndex, endIndex);
+            
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.w),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: pageButtons.map((button) {
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: _buildActionButton(
+                        button['icon'],
+                        button['label'],
+                        onTap: button['onTap'],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            );
+          },
+        ),
+      ),
+      
+      SizedBox(height: 12.h),
+      
+      // Dot indicators
+      if (totalPages > 1)
+        _buildDotIndicators(totalPages),
+    ],
+  );
+}
+
+
+
+Widget _buildDotIndicators(int totalPages) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: List.generate(totalPages, (index) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        margin: EdgeInsets.symmetric(horizontal: 4.w),
+        height: 6.h,
+        width: _currentActionPage == index ? 20.w : 6.w,
+        decoration: BoxDecoration(
+          color: _currentActionPage == index
+              ? Colors.white
+              : Colors.white.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(3.r),
+        ),
+      );
+    }),
+  );
+}
+
 
   Widget _buildCampaignCard(BuildContext context) {
     return Container(
@@ -1683,31 +1744,6 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(
-    IconData icon,
-    String label, {
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          CircleAvatar(
-            backgroundColor: Colors.white24,
-            radius: 24.r,
-            child: Icon(icon, color: Colors.white, size: 24.sp),
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            label,
-            style: GoogleFonts.montserrat(color: Colors.white, fontSize: 13.sp),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }
