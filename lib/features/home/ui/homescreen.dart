@@ -58,6 +58,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool _walletFetched = false;
   bool _transactionsFetched = false;
 
+  // ✅ Add balance visibility state
+  bool _isBalanceVisible = true;
+
   late AnimationController _bannerAnimationController;
   late Animation<double> _fadeAnimation;
   Timer? _imageTimer;
@@ -113,6 +116,9 @@ class _HomeScreenState extends State<HomeScreen>
     'assets/images/home_images/gift_box_2.png',
     'assets/images/home_images/shopping_trolley.png',
   ];
+
+  PageController _pageController = PageController();
+  int _currentCardIndex = 0;
 
   @override
   void initState() {
@@ -220,21 +226,20 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _refreshData() async {
-    final cubit = context.read<HomeCubit>();
-
-    // Prevent overlapping API calls
-    if (_walletLoading || _txLoading) return;
-
+    // Robust reset of load/completion flags at refresh start
     setState(() {
+      _walletFetched = false;
+      _transactionsFetched = false;
+      _isLoading = true;
       _txLoading = true;
       _txError = null;
     });
 
+    final cubit = context.read<HomeCubit>();
+    // Parallel fetch, let listeners flip flags when done
     await Future.wait([
-      cubit.fetchUserWallet().then((_) => _walletLoading = false),
-      cubit.fetchLatestTransactions().then(
-        (_) => setState(() => _txLoading = false),
-      ),
+      cubit.fetchUserWallet(),
+      cubit.fetchLatestTransactions(),
     ]);
   }
 
@@ -367,21 +372,21 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: 20.w,
-                          vertical: 4.h,
+                          vertical: 12.h,
                         ),
                         child: Column(
                           children: [
                             // Christmas banner
-                            // _buildChristmasBanner(context),
-                            // SizedBox(height: 22.h),
+                            _buildChristmasBanner(context),
+                            SizedBox(height: 22.h),
 
                             // Campaign cards
-                            _buildCampaignCard(context),
-                            SizedBox(height: 20.h),
+                            // _buildCampaignCard(context),
+                            // SizedBox(height: 20.h),
 
                             // Shopping Wallets Section
-                             _buildShoppingWalletsSection(context),
-                             SizedBox(height: 12.h),
+                            _buildShoppingWalletsSection(context),
+                            SizedBox(height: 12.h),
 
                             // Transactions section
                             _buildTransactionsSection(context),
@@ -455,14 +460,25 @@ class _HomeScreenState extends State<HomeScreen>
                           fontWeight: FontWeight.w400,
                         ),
                       ),
-                      Text(
-                        widget.userModel.user.firstName.toUpperCase(),
-                        style: GoogleFonts.montserrat(
-                          fontSize: 20.sp,
-                          color: isDark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            widget.userModel.user.firstName.toUpperCase(),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 20.sp,
+                              color: isDark ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          SizedBox(width: 6.w), // small space
+                          Text(
+                            "👋",
+                            style: TextStyle(
+                              fontSize: 20.sp, // match size with the name
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -471,25 +487,25 @@ class _HomeScreenState extends State<HomeScreen>
               Row(
                 children: [
                   // QR Code Icon
-                  GestureDetector(
-                    onTap: () {
-                      // Add QR code functionality here
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(8.w),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.grey[800]?.withOpacity(0.5)
-                            : Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: Icon(
-                        Icons.qr_code_scanner,
-                        color: isDark ? Colors.grey[300] : Colors.black54,
-                        size: 24.sp,
-                      ),
-                    ),
-                  ),
+                  // GestureDetector(
+                  //   onTap: () {
+                  //     // Add QR code functionality here
+                  //   },
+                  //   child: Container(
+                  //     padding: EdgeInsets.all(8.w),
+                  //     decoration: BoxDecoration(
+                  //       color: isDark
+                  //           ? Colors.grey[800]?.withOpacity(0.5)
+                  //           : Colors.grey.withOpacity(0.1),
+                  //       borderRadius: BorderRadius.circular(8.r),
+                  //     ),
+                  //     child: Icon(
+                  //       Icons.qr_code_scanner,
+                  //       color: isDark ? Colors.grey[300] : Colors.black54,
+                  //       size: 24.sp,
+                  //     ),
+                  //   ),
+                  // ),
                   SizedBox(width: 12.w),
                   // Notifications
                   GestureDetector(
@@ -565,7 +581,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildBalanceCardContent() {
-    bool isBalanceVisible = true;
+    // Remove local variable declarations that override class-level state
     bool showRefreshIcon = true;
     bool isKapuButtonPressed = false;
 
@@ -606,7 +622,8 @@ class _HomeScreenState extends State<HomeScreen>
         // Balance amount with visibility toggle
         BlocBuilder<HomeCubit, HomeState>(
           builder: (context, state) {
-            if (_isLoading) {
+            if (state is HomeWalletInitial || state is HomeWalletLoading) {
+              // Show shimmer
               return Container(
                 height: 40.h,
                 width: 200.w,
@@ -616,41 +633,52 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               );
             }
-
-            double? balance;
             if (state is HomeWalletFetched) {
               final wallet =
                   state.walletResponse.data?.walletAccount?.walletBalance;
-              balance = wallet?.balance.toDouble();
+              final balance = wallet?.balance.toDouble();
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    balance != null
+                        ? (_isBalanceVisible
+                              ? 'KES ${balance.toStringAsFixed(2)}'
+                              : 'KES ******')
+                        : 'KES ******',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 24.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isBalanceVisible = !_isBalanceVisible;
+                      });
+                    },
+                    child: Icon(
+                      _isBalanceVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: Colors.white70,
+                      size: 20.sp,
+                    ),
+                  ),
+                ],
+              );
             }
-
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  balance != null
-                      ? (isBalanceVisible
-                            ? 'KES ${balance.toStringAsFixed(2)}'
-                            : 'KES ******')
-                      : 'KES ******',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 24.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    // Toggle balance visibility - you may need to manage this state
-                  },
-                  child: Icon(
-                    isBalanceVisible ? Icons.visibility : Icons.visibility_off,
-                    color: Colors.white70,
-                    size: 20.sp,
-                  ),
-                ),
-              ],
+            // On error or other state
+            return Text(
+              'KES ******',
+              style: GoogleFonts.montserrat(
+                fontSize: 24.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 1.2,
+              ),
             );
           },
         ),
@@ -1436,12 +1464,11 @@ class _HomeScreenState extends State<HomeScreen>
 
         // Add spacing before shopping wallets section
         // SizedBox(height: 12.h),
-
-       
       ],
     );
   }
 
+  
   Widget _buildShoppingWalletsSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1634,6 +1661,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  
   Widget _buildActionButton(
     IconData icon,
     String label, {

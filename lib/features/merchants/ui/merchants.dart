@@ -33,6 +33,7 @@ class _MerchantsScreenState extends State<MerchantsScreen> {
     "Naivas Supermarket": "assets/merchantspageimg/Naivas.png",
     "ZuriMall Limited": "assets/merchantspageimg/Zurimall.png",
     "Quickmart Supermarket": "assets/merchantspageimg/Quickmart.png",
+    "Citywalk Limited": "assets/merchantspageimg/Citywalk.png",
   };
 
   @override

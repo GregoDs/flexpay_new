@@ -2,6 +2,7 @@ import 'package:flexpay/features/auth/cubit/auth_cubit.dart';
 import 'package:flexpay/features/auth/cubit/auth_state.dart';
 import 'package:flexpay/features/auth/models/user_model.dart';
 import 'package:flexpay/features/flexchama/cubits/chama_cubit.dart';
+import 'package:flexpay/features/home/cubits/home_cubit.dart';
 import 'package:flexpay/gen/colors.gen.dart';
 import 'package:flexpay/main.dart';
 import 'package:flexpay/routes/app_routes.dart';
@@ -92,8 +93,9 @@ class _OtpScreenState extends State<OtpScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF1A1A1A) : ColorName.whiteColor,
+      backgroundColor: isDarkMode
+          ? const Color(0xFF1A1A1A)
+          : ColorName.whiteColor,
       body: SafeArea(
         child: BlocListener<AuthCubit, AuthState>(
           listener: (context, state) async {
@@ -104,10 +106,9 @@ class _OtpScreenState extends State<OtpScreen> {
                 message: "Sorry, your session has ended. Please log in again.",
               );
               await Future.delayed(const Duration(seconds: 2));
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                Routes.login,
-                (route) => false,
-              );
+              Navigator.of(
+                context,
+              ).pushNamedAndRemoveUntil(Routes.login, (route) => false);
             }
           },
           child: BlocConsumer<AuthCubit, AuthState>(
@@ -115,8 +116,10 @@ class _OtpScreenState extends State<OtpScreen> {
               if (state is AuthUserUpdated) {
                 try {
                   context.read<ChamaCubit>().clearUserData();
-                } catch (e) {
-                }
+                  context
+                      .read<HomeCubit>()
+                      .clearUserData(); // Reset home cubit when new user logs in
+                } catch (e) {}
 
                 final userModel = state.userModel;
                 Navigator.pushNamedAndRemoveUntil(
@@ -216,7 +219,9 @@ class _OtpScreenState extends State<OtpScreen> {
                                       : ColorName.blackColor,
                                 ),
                                 onPressed: () => Navigator.pushReplacementNamed(
-                                    context, Routes.login),
+                                  context,
+                                  Routes.login,
+                                ),
                               ),
                               const Text(
                                 "Verify otp",
@@ -275,12 +280,15 @@ class _OtpScreenState extends State<OtpScreen> {
                             borderRadius: BorderRadius.circular(10),
                             fieldHeight: 68,
                             fieldWidth: 58,
-                            activeFillColor:
-                                isDarkMode ? Colors.grey[800] : Colors.white,
-                            inactiveFillColor:
-                                isDarkMode ? Colors.grey[900] : Colors.white,
-                            selectedFillColor:
-                                isDarkMode ? Colors.grey[800] : Colors.white,
+                            activeFillColor: isDarkMode
+                                ? Colors.grey[800]
+                                : Colors.white,
+                            inactiveFillColor: isDarkMode
+                                ? Colors.grey[900]
+                                : Colors.white,
+                            selectedFillColor: isDarkMode
+                                ? Colors.grey[800]
+                                : Colors.white,
                             activeColor: ColorName.primaryColor,
                             inactiveColor: isDarkMode
                                 ? Colors.grey[700]
@@ -311,8 +319,8 @@ class _OtpScreenState extends State<OtpScreen> {
                           child: ElevatedButton(
                             onPressed:
                                 (_otpController.text.length == 4 && !_isLoading)
-                                    ? _onVerifyOtp
-                                    : null,
+                                ? _onVerifyOtp
+                                : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: ColorName.primaryColor,
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -357,15 +365,16 @@ class _OtpScreenState extends State<OtpScreen> {
                         TextButton(
                           onPressed:
                               (_secondsRemaining == 0 && !_isResendingOtp)
-                                  ? _resendOtp
-                                  : null,
+                              ? _resendOtp
+                              : null,
                           child: _isResendingOtp
                               ? const SizedBox(
                                   height: 18,
                                   width: 18,
                                   child: CircularProgressIndicator(
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                        ColorName.blue200),
+                                      ColorName.blue200,
+                                    ),
                                     strokeWidth: 2,
                                   ),
                                 )

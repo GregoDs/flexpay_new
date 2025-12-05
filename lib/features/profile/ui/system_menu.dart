@@ -11,8 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flexpay/features/auth/models/user_model.dart';
-import 'package:upgrader/upgrader.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flexpay/features/home/cubits/home_cubit.dart';
 
 class ProfilePage extends StatefulWidget {
   final UserModel userModel;
@@ -529,6 +529,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
               try {
                 context.read<ChamaCubit>().clearUserData();
+                context
+                    .read<HomeCubit>()
+                    .clearUserData(); // Added: reset home cubit
               } catch (e) {}
 
               await SharedPreferencesHelper.clearUserModel();

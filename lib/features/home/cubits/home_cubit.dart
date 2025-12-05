@@ -39,4 +39,9 @@ class HomeCubit extends Cubit<HomeState> {
       emit(HomeReferralFailure(e.toString()));
     }
   }
+
+  /// Clear all user-specific HomeCubit state (for logout/user switch)
+  void clearUserData() {
+    emit(HomeWalletInitial());
+  }
 }
