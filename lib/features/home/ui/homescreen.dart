@@ -1468,7 +1468,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  
   Widget _buildShoppingWalletsSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1597,7 +1596,7 @@ class _HomeScreenState extends State<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Top section with icon and title
+              // Top section with icon, title, and visibility toggle
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1609,23 +1608,50 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     child: Icon(icon, color: Colors.white, size: 20.sp),
                   ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Text(
-                      'Active',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 8.sp,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
+                  Row(
+                    children: [
+                      // Hide/Show balance toggle
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isBalanceVisible = !_isBalanceVisible;
+                          });
+                        },
+                        child: Container(
+                          padding: EdgeInsets.all(4.w),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                          child: Icon(
+                            _isBalanceVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: Colors.white70,
+                            size: 16.sp,
+                          ),
+                        ),
                       ),
-                    ),
+                      SizedBox(width: 8.w),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8.w,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Text(
+                          'Active',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 8.sp,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1644,9 +1670,9 @@ class _HomeScreenState extends State<HomeScreen>
                 overflow: TextOverflow.ellipsis,
               ),
 
-              // Balance
+              // Balance with visibility toggle
               Text(
-                balance,
+                _isBalanceVisible ? balance : 'KES ******',
                 style: GoogleFonts.montserrat(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w600,
@@ -1661,7 +1687,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  
   Widget _buildActionButton(
     IconData icon,
     String label, {
